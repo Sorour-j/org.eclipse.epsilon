@@ -1,5 +1,6 @@
 package org.eclipse.epsilon.eol.staticanalyser;
 
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -7,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.eclipse.epsilon.common.dt.editor.AbstractModuleEditor;
-import org.eclipse.epsilon.common.dt.editor.ModelTypeExtensionFactory;
 import org.eclipse.epsilon.common.module.IModule;
 import org.eclipse.epsilon.common.module.IModuleValidator;
 import org.eclipse.epsilon.common.module.ModuleElement;
@@ -15,9 +15,7 @@ import org.eclipse.epsilon.common.module.ModuleMarker;
 import org.eclipse.epsilon.common.module.ModuleMarker.Severity;
 import org.eclipse.epsilon.common.util.StringProperties;
 import org.eclipse.epsilon.common.util.StringUtil;
-import org.eclipse.epsilon.eol.BuiltinEolModule;
 import org.eclipse.epsilon.eol.EolModule;
-import org.eclipse.epsilon.eol.IEolModule;
 import org.eclipse.epsilon.eol.compile.context.EolCompilationContext;
 import org.eclipse.epsilon.eol.compile.m3.MetaClass;
 import org.eclipse.epsilon.eol.compile.m3.StructuralFeature;
@@ -89,8 +87,6 @@ import org.eclipse.epsilon.eol.dom.XorOperatorExpression;
 import org.eclipse.epsilon.eol.execute.context.FrameStack;
 import org.eclipse.epsilon.eol.execute.context.FrameType;
 import org.eclipse.epsilon.eol.execute.context.Variable;
-import org.eclipse.epsilon.eol.models.IModel;
-import org.eclipse.epsilon.eol.models.IRewriter;
 import org.eclipse.epsilon.eol.types.EolAnyType;
 import org.eclipse.epsilon.eol.types.EolCollectionType;
 import org.eclipse.epsilon.eol.types.EolMapType;
@@ -119,6 +115,9 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 	public EolStaticAnalyser() {
 	}
 
+	public List<ModuleMarker> getErrors(){
+		return errors;
+	}
 	@Override
 	public void visit(AbortStatement abortStatement) {
 		// TODO Auto-generated method stub
@@ -574,7 +573,7 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 
 		newInstanceExpression.getTypeExpression().accept(this);
 		for (Expression parameterExpression : newInstanceExpression.getParameterExpressions()) {
-			parameterExpression.compile(context);
+			parameterExpression.accept(this);
 		}
 		newInstanceExpression.setResolvedType(newInstanceExpression.getTypeExpression().getResolvedType());
 	}
@@ -732,10 +731,9 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 							Severity.Warning));
 
 				} else if (targetExpression instanceof OperationCallExpression) {
-					if (!((OperationCallExpression) targetExpression).matchedReturnType.isEmpty()) {
-						for (int i = 0; i < ((OperationCallExpression) targetExpression).matchedReturnType
-								.size(); i++) {
-							contextType = ((OperationCallExpression) targetExpression).matchedReturnType.get(i);
+					if (!getMatchedReturnType((OperationCallExpression) targetExpression).isEmpty()) {
+						for (int i = 0; i < getMatchedReturnType((OperationCallExpression) targetExpression).size(); i++) {
+							contextType = getMatchedReturnType((OperationCallExpression) targetExpression).get(i);
 
 							if (isCompatible(op.getContextTypeExpression().getResolvedType(), contextType)) {
 								errorCode = 0;
@@ -817,7 +815,7 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 										nameExpression, " Parameter " + provPrameter
 												+ " might not match, as it requires " + reqParameter,
 										Severity.Warning));
-							} else if (operationCallExpression.getMatchedReturnTypes().isEmpty()) {
+							} else if (getMatchedReturnType((operationCallExpression)).isEmpty()) {
 								// Bcz if we found the perfect match before, no need to make success false at
 								// the end
 								errorCode = 3;
@@ -1046,7 +1044,7 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 		Expression returnedExpression = returnStatement.getReturnedExpression();
 		if (returnedExpression != null) {
 
-			returnedExpression.compile(context);
+			returnedExpression.accept(this);
 
 			EolType providedReturnType = returnedExpression.getResolvedType();
 
@@ -1063,7 +1061,7 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 				// add for setting resolved type
 				if (((Operation) parent).getReturnTypeExpression() == null)
 					((Operation) parent).setReturnTypeExpression(new TypeExpression("Any"));
-				(((Operation) parent).getReturnTypeExpression()).compile(context);
+				(((Operation) parent).getReturnTypeExpression()).accept(this);
 				EolType requiredReturnType = ((Operation) parent).getReturnTypeExpression().getResolvedType();
 
 				if (!(isCompatible(requiredReturnType, providedReturnType))) {
@@ -1169,8 +1167,8 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 			EolModelElementType modelElementType = context
 					.getModelElementType(typeExpression.getName());
 			if (modelElementType != null) {
+				
 				type = modelElementType;
-				// System.out.println("Printing:"+modelElementType.getMetaClass().getSuperTypes().get(0).getName());
 				if (modelElementType.getMetaClass() == null
 						&& !context.getModelDeclarations().isEmpty()) {
 					errors.add(new ModuleMarker(typeExpression, "Unknown type " + typeExpression.getName(),
@@ -1240,8 +1238,8 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 		for (ModelDeclaration modelDeclaration : module.getDeclaredModelDeclarations()) {
 			modelDeclaration.accept(this);
 		}
-
-		String root = "/Users/quratulainali/git/org.eclipse.epsilon/plugins/org.eclipse.epsilon.eol.engine/src/org/eclipse/epsilon/eol/";
+		
+		String root = "/Users/sorourjahanbin/git/org.eclipse.epsilon/plugins/org.eclipse.epsilon.eol.staticanalyser/src/org/eclipse/epsilon/eol/staticanalyser/";
 
 		if (!(module instanceof BuiltinEolModule)) {
 			try {
@@ -1287,13 +1285,12 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 		if (!(imodule instanceof EolModule))
 			return Collections.emptyList();
 
+		
 		errors = new ArrayList<>();
-		// errors = new ArrayList<>();
 
 		EolModule eolModule = (EolModule) imodule;
 		this.module = eolModule;
-		
-		context = eolModule.getCompilationContext();
+		context = (EolCompilationContext) module.getCompilationContext();
 		
 		preValidate();
 		
@@ -1304,31 +1301,15 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 		if (!(module instanceof BuiltinEolModule))
 			module.getOperations().removeAll(builtinModule.getDeclaredOperations());
 		
-		invokeRewriters(module);
 		return errors;
 	}
 	
-	public void invokeRewriters(IEolModule module) {
-		for (ModelDeclaration modelDeclaration : module.getDeclaredModelDeclarations()) {
-			
-		if(modelDeclaration.getDriverNameExpression().getName().equals("MySQL"))
-				module.getCompilationContext().setModelFactory(new ModelTypeExtensionFactory());
-
-			modelDeclaration.accept(this);
-			
-			IModel model = modelDeclaration.getModel();
-			if(model instanceof IRewriter)
-			{
-				((IRewriter)model).rewrite(module, context);
-			}
-		}
-	}
 
 	@Override
-	public java.lang.String getMarkerType() {
-		// TODO Auto-generated method stub
-		return null;
+	public String getMarkerType() {
+		return AbstractModuleEditor.PROBLEM_MARKER;
 	}
+
 
 	public void createTypeCompatibilityWarning(Expression requiredExpression, Expression providedExpression) {
 		errors.add(new ModuleMarker(providedExpression, providedExpression.getResolvedType()
@@ -1568,6 +1549,6 @@ public class EolStaticAnalyser implements IModuleValidator, IEolVisitor {
 	}
 	public void setMatched(OperationCallExpression operationCallExpression, boolean match) {
 	matched.put(operationCallExpression, match);
-}		
+}	
 
 }

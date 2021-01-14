@@ -641,15 +641,4 @@ public class EolModule extends AbstractModule implements IEolModule {
 		return rewritedQuery;
 	}
 
-	@Override
-	public void setText(String text) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public String getText() {
-		// TODO Auto-generated method stub
-		return null;
-	}
 }

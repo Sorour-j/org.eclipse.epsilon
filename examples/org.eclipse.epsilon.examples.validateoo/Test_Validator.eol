@@ -1,0 +1,8 @@
+model flowchart driver EMF {
+nsuri = "flowchart" 
+};
+
+for(a:Action in Action.all){
+
+("First name:" + a.name).println();
+}

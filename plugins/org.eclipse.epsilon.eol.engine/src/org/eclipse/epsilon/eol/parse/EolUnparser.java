@@ -710,10 +710,5 @@ public class EolUnparser implements IEolVisitor {
 		}
 	}
 
-	@Override
-	public void visit(OperatorExpression operatorExpression) {
-		// TODO Auto-generated method stub
-		
-	}
 	
 }

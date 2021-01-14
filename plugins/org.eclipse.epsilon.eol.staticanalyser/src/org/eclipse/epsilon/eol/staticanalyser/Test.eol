@@ -1,0 +1,9 @@
+"D". HelloWorld(). HelloCol();
+
+operation String HelloWorld(): String{
+		return "Hello "+ self;
+}
+
+operation Collection<Any> HelloCol(): String{
+		return "Hello "+ self;
+}
